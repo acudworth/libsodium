@@ -19,6 +19,8 @@ Sodium supports a variety of compilers and operating systems,
 including Windows (with MingW or Visual Studio, x86 and x64), iOS, Android,
 as well as Javascript and Webassembly.
 
+Note: Some modifications were made to ed25519 signing functions to be compatible with RaiBlocks (XRB) signing. RaiBlocks uses ed25519-blake2b instead of ed25519-sha512.
+
 ## Documentation
 
 The documentation is available on Gitbook:
