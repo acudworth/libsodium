@@ -3,7 +3,7 @@
 if glibtoolize --version > /dev/null 2>&1; then
   LIBTOOLIZE='glibtoolize'
 else
-  LIBTOOLIZE='libtoolize'
+  LIBTOOLIZE='libtool'
 fi
 
 command -v command >/dev/null 2>&1 || {
