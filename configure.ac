@@ -202,6 +202,9 @@ AC_CHECK_DEFINE([_FORTIFY_SOURCE], [], [
 AX_CHECK_COMPILE_FLAG([-fvisibility=hidden],
   [CFLAGS="$CFLAGS -fvisibility=hidden"])
 
+AX_CHECK_COMPILE_FLAG([-mretpoline],
+  [CFLAGS="$CFLAGS -mretpoline"])
+
 AS_CASE([$host_os], [cygwin*|mingw*|msys|pw32*|cegcc*], [ ], [
   AX_CHECK_COMPILE_FLAG([-fPIC], [CFLAGS="$CFLAGS -fPIC"])
 ])
@@ -323,6 +326,7 @@ AX_CHECK_COMPILE_FLAG([$CWFLAGS -Wwrite-strings], [CWFLAGS="$CWFLAGS -Wwrite-str
 AX_CHECK_LINK_FLAG([-Wl,-z,relro], [LDFLAGS="$LDFLAGS -Wl,-z,relro"])
 AX_CHECK_LINK_FLAG([-Wl,-z,now], [LDFLAGS="$LDFLAGS -Wl,-z,now"])
 AX_CHECK_LINK_FLAG([-Wl,-z,noexecstack], [LDFLAGS="$LDFLAGS -Wl,-z,noexecstack"])
+AX_CHECK_LINK_FLAG([-Wl,-z,retpolineplt], [LDFLAGS="$LDFLAGS -Wl,-z,retpolineplt"])
 
 AC_MSG_CHECKING(for a broken clang + AVX512 combination)
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[
@@ -580,6 +584,18 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
    CPPFLAGS="$CPPFLAGS -D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS"
 ])
 
+AC_MSG_CHECKING(whether we can use inline asm code)
+AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+]], [[
+int a = 42;
+int *pnt = &a;
+__asm__ __volatile__ ("" : : "r"(pnt) : "memory");
+]])],
+  [AC_MSG_RESULT(yes)
+   AC_DEFINE([HAVE_INLINE_ASM], [1], [inline asm code can be used])]
+  [AC_MSG_RESULT(no)]
+)
+
 HAVE_AMD64_ASM_V=0
 AS_IF([test "$enable_asm" != "no"],[
   AC_MSG_CHECKING(whether we can use x86_64 asm code)
@@ -635,18 +651,17 @@ AC_SUBST(HAVE_AVX_ASM_V)
 AC_MSG_CHECKING(for 128-bit arithmetic)
 HAVE_TI_MODE_V=0
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
-#if !defined(__GNUC__) && !defined(__SIZEOF_INT128__)
+#if !defined(__clang__) && !defined(__GNUC__) && !defined(__SIZEOF_INT128__)
 # error mode(TI) is a gcc extension, and __int128 is not available
 #endif
-#if defined(__clang__) && !defined(__x86_64__) && !defined(__ARM_NEON)
+#if defined(__clang__) && !defined(__x86_64__) && !defined(__aarch64__)
 # error clang does not properly handle the 128-bit type on 32-bit systems
 #endif
 #ifndef NATIVE_LITTLE_ENDIAN
 # error libsodium currently expects a little endian CPU for the 128-bit type
 #endif
 #ifdef __EMSCRIPTEN__
-# error emscripten currently supports only shift operations on integers \
-#       larger than 64 bits
+# error emscripten currently doesn't support some operations on integers larger than 64 bits
 #endif
 #include <stddef.h>
 #include <stdint.h>
@@ -657,6 +672,8 @@ typedef unsigned uint128_t __attribute__((mode(TI)));
 #endif
 void fcontract(uint128_t *t) {
   *t += 0x8000000000000 - 1;
+  *t *= *t;
+  *t >>= 84;
 }
 ]], [[
 (void) fcontract;
